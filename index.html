@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATM Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+    <div id="atm-container" class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+        <!-- PIN Authentication Screen -->
+        <div id="auth-screen" class="space-y-4">
+            <h1 class="text-2xl font-bold text-center">Welcome to the ATM</h1>
+            <div id="auth-error" class="text-red-500 text-center hidden"></div>
+            <input id="pin-input" type="password" placeholder="Enter your PIN" class="w-full p-2 border rounded">
+            <button onclick="authenticate()" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Submit</button>
+            <p id="attempts-remaining" class="text-center"></p>
+        </div>
+
+        <!-- Main Menu Screen -->
+        <div id="main-menu" class="space-y-4 hidden">
+            <h1 class="text-2xl font-bold text-center">ATM Menu</h1>
+            <button onclick="showBalance()" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Check Balance</button>
+            <button onclick="showWithdraw()" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Withdraw</button>
+            <button onclick="showDeposit()" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Deposit</button>
+            <button onclick="showChangePin()" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Change PIN</button>
+            <button onclick="showTransactionHistory()" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Transaction History</button>
+            <button onclick="exit()" class="w-full bg-red-500 text-white p-2 rounded hover:bg-red-600">Exit</button>
+        </div>
+
+        <!-- Balance Screen -->
+        <div id="balance-screen" class="space-y-4 hidden">
+            <h1 class="text-2xl font-bold text-center">Balance</h1>
+            <p id="balance-display" class="text-center"></p>
+            <button onclick="backToMenu()" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Back to Menu</button>
+        </div>
+
+        <!-- Withdraw Screen -->
+        <div id="withdraw-screen" class="space-y-4 hidden">
+            <h1 class="text-2xl font-bold text-center">Withdraw</h1>
+            <div id="withdraw-error" class="text-red-500 text-center hidden"></div>
+            <input id="withdraw-amount" type="number" placeholder="Enter amount to withdraw" class="w-full p-2 border rounded">
+            <button onclick="withdraw()" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Withdraw</button>
+            <button onclick="backToMenu()" class="w-full bg-gray-500 text-white p-2 rounded hover:bg-gray-600">Back</button>
+        </div>
+
+        <!-- Deposit Screen -->
+        <div id="deposit-screen" class="space-y-4 hidden">
+            <h1 class="text-2xl font-bold text-center">Deposit</h1>
+            <div id="deposit-error" class="text-red-500 text-center hidden"></div>
+            <input id="deposit-amount" type="number" placeholder="Enter amount to deposit" class="w-full p-2 border rounded">
+            <button onclick="deposit()" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Deposit</button>
+            <button onclick="backToMenu()" class="w-full bg-gray-500 text-white p-2 rounded hover:bg-gray-600">Back</button>
+        </div>
+
+        <!-- Change PIN Screen -->
+        <div id="change-pin-screen" class="space-y-4 hidden">
+            <h1 class="text-2xl font-bold text-center">Change PIN</h1>
+            <div id="change-pin-error" class="text-red-500 text-center hidden"></div>
+            <input id="current-pin" type="password" placeholder="Enter current PIN" class="w-full p-2 border rounded">
+            <input id="new-pin" type="password" placeholder="Enter new 4-digit PIN" class="w-full p-2 border rounded">
+            <button onclick="changePin()" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Change PIN</button>
+            <button onclick="backToMenu()" class="w-full bg-gray-500 text-white p-2 rounded hover:bg-gray-600">Back</button>
+        </div>
+
+        <!-- Transaction History Screen -->
+        <div id="history-screen" class="space-y-4 hidden">
+            <h1 class="text-2xl font-bold text-center">Transaction History</h1>
+            <div id="history-list" class="border p-4 rounded max-h-64 overflow-y-auto"></div>
+            <button onclick="backToMenu()" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Back to Menu</button>
+        </div>
+
+        <!-- Exit Screen -->
+        <div id="exit-screen" class="space-y-4 hidden">
+            <h1 class="text-2xl font-bold text-center">Thank You</h1>
+            <p class="text-center">Thank you for using the ATM. Goodbye!</p>
+        </div>
+
+        <!-- Locked Screen -->
+        <div id="locked-screen" class="space-y-4 hidden">
+            <h1 class="text-2xl font-bold text-center text-red-500">Account Locked</h1>
+            <p class="text-center">Too many incorrect attempts. Account locked.</p>
+        </div>
+    </div>
+
+    <script>
+        class Account {
+            constructor(initialBalance, initialPin) {
+                this.balance = initialBalance;
+                this.pin = initialPin;
+                this.transactionHistory = [`${new Date().toLocaleString()} - Account created with initial balance: $${initialBalance}`];
+            }
+
+            validatePin(enteredPin) {
+                return this.pin === enteredPin;
+            }
+
+            getBalance() {
+                return this.balance;
+            }
+
+            withdraw(amount) {
+                if (amount > 0 && amount <= this.balance) {
+                    this.balance -= amount;
+                    this.addTransaction(`Withdrawal: -$${amount}, New Balance: $${this.balance}`);
+                    return true;
+                }
+                return false;
+            }
+
+            deposit(amount) {
+                if (amount > 0) {
+                    this.balance += amount;
+                    this.addTransaction(`Deposit: +$${amount}, New Balance: $${this.balance}`);
+                }
+            }
+
+            changePin(oldPin, newPin) {
+                if (this.validatePin(oldPin) && newPin.length === 4 && /^\d+$/.test(newPin)) {
+                    this.pin = newPin;
+                    this.addTransaction("PIN changed successfully");
+                    return true;
+                }
+                return false;
+            }
+
+            getTransactionHistory() {
+                return this.transactionHistory;
+            }
+
+            addTransaction(transaction) {
+                this.transactionHistory.push(`${new Date().toLocaleString()} - ${transaction}`);
+            }
+        }
+
+        const account = new Account(1000.00, "1234");
+        let isAuthenticated = false;
+        let attempts = 3;
+
+        function showScreen(screenId) {
+            document.querySelectorAll('#atm-container > div').forEach(div => div.classList.add('hidden'));
+            document.getElementById(screenId).classList.remove('hidden');
+        }
+
+        function authenticate() {
+            const pin = document.getElementById('pin-input').value;
+            const authError = document.getElementById('auth-error');
+            if (account.validatePin(pin)) {
+                isAuthenticated = true;
+                showScreen('main-menu');
+                authError.classList.add('hidden');
+            } else {
+                attempts--;
+                authError.textContent = `Invalid PIN. ${attempts} attempts remaining.`;
+                authError.classList.remove('hidden');
+                document.getElementById('attempts-remaining').textContent = '';
+                if (attempts === 0) {
+                    showScreen('locked-screen');
+                }
+            }
+            document.getElementById('pin-input').value = '';
+        }
+
+        function showBalance() {
+            document.getElementById('balance-display').textContent = `Current Balance: $${account.getBalance().toFixed(2)}`;
+            showScreen('balance-screen');
+        }
+
+        function showWithdraw() {
+            document.getElementById('withdraw-amount').value = '';
+            document.getElementById('withdraw-error').classList.add('hidden');
+            showScreen('withdraw-screen');
+        }
+
+        function withdraw() {
+            const amount = parseFloat(document.getElementById('withdraw-amount').value);
+            const withdrawError = document.getElementById('withdraw-error');
+            if (isNaN(amount)) {
+                withdrawError.textContent = "Invalid input. Please enter a numeric value.";
+                withdrawError.classList.remove('hidden');
+                return;
+            }
+            if (account.withdraw(amount)) {
+                withdrawError.textContent = `Withdrawal successful. New Balance: $${account.getBalance().toFixed(2)}`;
+                withdrawError.classList.remove('hidden');
+                withdrawError.classList.remove('text-red-500');
+                withdrawError.classList.add('text-green-500');
+            } else {
+                withdrawError.textContent = "Insufficient funds or invalid amount.";
+                withdrawError.classList.remove('hidden');
+                withdrawError.classList.add('text-red-500');
+                withdrawError.classList.remove('text-green-500');
+            }
+            document.getElementById('withdraw-amount').value = '';
+        }
+
+        function showDeposit() {
+            document.getElementById('deposit-amount').value = '';
+            document.getElementById('deposit-error').classList.add('hidden');
+            showScreen('deposit-screen');
+        }
+
+        function deposit() {
+            const amount = parseFloat(document.getElementById('deposit-amount').value);
+            const depositError = document.getElementById('deposit-error');
+            if (isNaN(amount)) {
+                depositError.textContent = "Invalid input. Please enter a numeric value.";
+                depositError.classList.remove('hidden');
+                return;
+            }
+            account.deposit(amount);
+            depositError.textContent = `Deposit successful. New Balance: $${account.getBalance().toFixed(2)}`;
+            depositError.classList.remove('hidden');
+            depositError.classList.remove('text-red-500');
+            depositError.classList.add('text-green-500');
+            document.getElementById('deposit-amount').value = '';
+        }
+
+        function showChangePin() {
+            document.getElementById('current-pin').value = '';
+            document.getElementById('new-pin').value = '';
+            document.getElementById('change-pin-error').classList.add('hidden');
+            showScreen('change-pin-screen');
+        }
+
+        function changePin() {
+            const oldPin = document.getElementById('current-pin').value;
+            const newPin = document.getElementById('new-pin').value;
+            const changePinError = document.getElementById('change-pin-error');
+            if (account.changePin(oldPin, newPin)) {
+                changePinError.textContent = "PIN changed successfully.";
+                changePinError.classList.remove('hidden');
+                changePinError.classList.remove('text-red-500');
+                changePinError.classList.add('text-green-500');
+            } else {
+                changePinError.textContent = "Failed to change PIN. Check current PIN or ensure new PIN is 4 digits.";
+                changePinError.classList.remove('hidden');
+                changePinError.classList.add('text-red-500');
+                changePinError.classList.remove('text-green-500');
+            }
+            document.getElementById('current-pin').value = '';
+            document.getElementById('new-pin').value = '';
+        }
+
+        function showTransactionHistory() {
+            const historyList = document.getElementById('history-list');
+            historyList.innerHTML = '';
+            const history = account.getTransactionHistory();
+            if (history.length === 0) {
+                historyList.textContent = 'No transactions found.';
+            } else {
+                history.forEach(transaction => {
+                    const p = document.createElement('p');
+                    p.textContent = transaction;
+                    historyList.appendChild(p);
+                });
+            }
+            showScreen('history-screen');
+        }
+
+        function backToMenu() {
+            showScreen('main-menu');
+        }
+
+        function exit() {
+            showScreen('exit-screen');
+        }
+    </script>
+</body>
+</html>
